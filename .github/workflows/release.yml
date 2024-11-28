@@ -1,9 +1,7 @@
 name: Sync Release
 on:
-  # 定期检查上游 release（每小时检查一次）
   schedule:
     - cron: '0 * * * *'
-  # 保留手动触发选项
   workflow_dispatch:
 
 jobs:
@@ -26,40 +24,43 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetch upstream
+      - name: Check and sync latest release
+        id: check_release
         run: |
-          git remote add upstream https://github.com/lobehub/lobe-chat.git
-          git fetch upstream --tags
-
-      - name: Sync latest release
-        run: |
-          # 获取上游最新的 release tag
-          UPSTREAM_LATEST_TAG=$(git ls-remote --tags upstream | sort -t '/' -k 3 -V | tail -n 1 | awk -F/ '{print $3}')
-          echo "Latest upstream tag: $UPSTREAM_LATEST_TAG"
+          # 获取官方仓库最新的 release 版本号
+          LATEST_RELEASE=$(curl -s https://api.github.com/repos/lobehub/lobe-chat/releases/latest | jq -r .tag_name)
+          echo "Latest official release: $LATEST_RELEASE"
           
-          # 检查本地是否已有该 tag
-          if git rev-parse -q --verify "refs/tags/$UPSTREAM_LATEST_TAG" >/dev/null; then
-            echo "Tag $UPSTREAM_LATEST_TAG already exists locally"
-            exit 0
+          # 获取当前仓库的最新 tag
+          CURRENT_TAG=$(git describe --tags `git rev-list --tags --max-count=1` 2>/dev/null || echo "v0.0.0")
+          echo "Current repository tag: $CURRENT_TAG"
+          
+          # 比较版本号，如果不同则需要更新
+          if [ "$LATEST_RELEASE" != "$CURRENT_TAG" ]; then
+            echo "New version detected, will update to $LATEST_RELEASE"
+            echo "need_update=true" >> $GITHUB_OUTPUT
+            echo "new_version=$LATEST_RELEASE" >> $GITHUB_OUTPUT
+          else
+            echo "Already up to date"
+            echo "need_update=false" >> $GITHUB_OUTPUT
           fi
-          
-          # 创建新的 tag
-          echo "Creating new tag: $UPSTREAM_LATEST_TAG"
-          git tag $UPSTREAM_LATEST_TAG
-          git push origin $UPSTREAM_LATEST_TAG
 
       - name: Install bun
+        if: steps.check_release.outputs.need_update == 'true'
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
 
       - name: Install deps
+        if: steps.check_release.outputs.need_update == 'true'
         run: bun i
 
       - name: Lint
+        if: steps.check_release.outputs.need_update == 'true'
         run: bun run lint
 
       - name: Test Server Coverage
+        if: steps.check_release.outputs.need_update == 'true'
         run: bun run test-server:coverage
         env:
           DATABASE_TEST_URL: postgresql://postgres:postgres@localhost:5432/postgres
@@ -70,12 +71,35 @@ jobs:
           APP_URL: https://home.com
 
       - name: Test App Coverage
+        if: steps.check_release.outputs.need_update == 'true'
         run: bun run test-app:coverage
 
       - name: Workflow
+        if: steps.check_release.outputs.need_update == 'true'
         run: bun run workflow:readme
 
+      - name: Create Release
+        if: steps.check_release.outputs.need_update == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          NEW_VERSION: ${{ steps.check_release.outputs.new_version }}
+        run: |
+          # 获取官方release的信息
+          RELEASE_INFO=$(curl -s https://api.github.com/repos/lobehub/lobe-chat/releases/latest)
+          RELEASE_BODY=$(echo "$RELEASE_INFO" | jq -r .body)
+          
+          # 创建新的 tag
+          git tag $NEW_VERSION
+          git push origin $NEW_VERSION
+          
+          # 创建 release
+          gh release create $NEW_VERSION \
+            --title "$NEW_VERSION" \
+            --notes "$RELEASE_BODY" \
+            --target main
+
       - name: Commit changes
+        if: steps.check_release.outputs.need_update == 'true'
         run: |-
           git diff
           git config --global user.name "lobehubbot"
