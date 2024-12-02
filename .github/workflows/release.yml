@@ -23,6 +23,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN }}
 
       - name: Check and sync latest release
         id: check_release
@@ -78,8 +79,20 @@ jobs:
         if: steps.check_release.outputs.need_update == 'true'
         run: bun run workflow:readme
 
-      - name: Create Release
+      - name: Check if tag already exists
         if: steps.check_release.outputs.need_update == 'true'
+        id: check_tag
+        run: |
+          if git rev-parse "${{ steps.check_release.outputs.new_version }}" >/dev/null 2>&1; then
+            echo "Tag already exists"
+            echo "tag_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Tag does not exist"
+            echo "tag_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        if: steps.check_release.outputs.need_update == 'true' && steps.check_tag.outputs.tag_exists == 'false'
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           NEW_VERSION: ${{ steps.check_release.outputs.new_version }}
@@ -99,7 +112,7 @@ jobs:
             --target main
 
       - name: Commit changes
-        if: steps.check_release.outputs.need_update == 'true'
+        if: steps.check_release.outputs.need_update == 'true' && steps.check_tag.outputs.tag_exists == 'false'
         run: |-
           git diff
           git config --global user.name "lobehubbot"
