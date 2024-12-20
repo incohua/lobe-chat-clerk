@@ -1,29 +1,66 @@
-name: Release CI
+name: Sync and Release
+
 on:
-  push:
-    branches:
-      - main
+  schedule:
+    - cron: '0 0 * * *' # Run daily at 00:00, adjust as needed
+  workflow_dispatch:
 
 jobs:
-  release:
-    name: Release
+  sync-and-release:
+    name: Sync and Release
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: pgvector/pgvector:pg16
-        env:
-          POSTGRES_PASSWORD: postgres
-        options: >-
-          --health-cmd pg_isready --health-interval 10s --health-timeout 5s  --health-retries 5
-        ports:
-          - 5432:5432
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN }}
 
-      - name: Test Server
-        run: echo "Running server tests..."
+      - name: Configure Git
+        run: |
+          git config user.name "lobehubbot"
+          git config user.email "i@lobehub.com"
+
+      - name: Sync Upstream Repository
+        run: |
+          git remote add upstream https://github.com/lobehub/lobe-chat.git
+          git fetch upstream
+          git checkout main
+          git merge upstream/main --ff-only
+          git push origin main
+
+      - name: Check Upstream Version
+        id: check_release
+        run: |
+          LATEST_RELEASE=$(curl -s https://api.github.com/repos/lobehub/lobe-chat/releases/latest | jq -r .tag_name)
+          echo "Upstream latest version: $LATEST_RELEASE"
+          CURRENT_TAG=$(git describe --tags `git rev-list --tags --max-count=1` 2>/dev/null || echo "v0.0.0")
+          echo "Current repository tag: $CURRENT_TAG"
+
+          if [ "$LATEST_RELEASE" != "$CURRENT_TAG" ]; then
+            echo "New version detected: $LATEST_RELEASE"
+            echo "new_version=$LATEST_RELEASE" >> $GITHUB_OUTPUT
+          else:
+            echo "No new version detected"
+            exit 0  # Exit early if no new version
+          fi
+
+      - name: Install bun
+        if: steps.check_release.outputs.new_version != ''
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install Dependencies
+        if: steps.check_release.outputs.new_version != ''
+        run: bun i
+
+      - name: Run Basic Tests (Example)
+        if: steps.check_release.outputs.new_version != ''
+        run: |
+          set -e
+          bun run test-server:coverage
         env:
           DATABASE_TEST_URL: postgresql://postgres:postgres@localhost:5432/postgres
           DATABASE_DRIVER: node
@@ -32,5 +69,40 @@ jobs:
           S3_PUBLIC_DOMAIN: https://example.com
           APP_URL: https://home.com
 
-      - name: Test App
-        run: echo "Running app tests..."
+      - name: Create Release
+        id: create_release
+        if: steps.check_release.outputs.new_version != ''
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          NEW_VERSION=${{ steps.check_release.outputs.new_version }}
+          RELEASE_INFO=$(curl -s https://api.github.com/repos/lobehub/lobe-chat/releases/latest)
+          RELEASE_BODY=$(echo "$RELEASE_INFO" | jq -r .body)
+
+          git tag $NEW_VERSION
+          git push origin $NEW_VERSION
+
+          gh release create $NEW_VERSION \
+            --title "$NEW_VERSION" \
+            --notes "$RELEASE_BODY" \
+            --target main
+            
+      - name: Notify Success
+        if: success() && steps.check_release.outputs.new_version != ''
+        uses: slackhq/slack-notifier@v2
+        with:
+          channel: '#your-channel-name' # Replace with your channel name
+          status: 'success'
+          message: 'Successfully released new version ${{ steps.create_release.outputs.new_version }} based on upstream! 🎉'
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+      - name: Notify Failure
+        if: failure() && steps.check_release.outputs.new_version != ''
+        uses: slackhq/slack-notifier@v2
+        with:
+          channel: '#your-channel-name' # Replace with your channel name
+          status: 'failure'
+          message: 'Failed to release new version based on upstream. Check the logs for details. 😢'
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
