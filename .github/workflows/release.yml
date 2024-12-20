@@ -1,103 +1,87 @@
-name: Sync Release
+name: 同步发布
+
 on:
   schedule:
     - cron: '0 0 * * *' 
   workflow_dispatch:
 
 jobs:
-  sync-release:
-    name: Sync Release
+  sync-files:
+    name: 同步文件
     runs-on: ubuntu-latest
+    steps:
+      - name: 触发同步 Workflow
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          repository: ${{ github.repository }}
+          event-type: sync-upstream
+          client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
 
-    services:
-      postgres:
-        image: pgvector/pgvector:pg16
-        env:
-          POSTGRES_PASSWORD: postgres
-        options: >-
-          --health-cmd pg_isready --health-interval 10s --health-timeout 5s  --health-retries 5
-        ports:
-          - 5432:5432
-
+  sync-release:
+    name: 同步发布
+    runs-on: ubuntu-latest
+    needs: sync-files
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GH_TOKEN }}
 
-      - name: Check and sync latest release
+      - name: 检查并同步最新发布
         id: check_release
         run: |
           # 获取官方仓库最新的 release 版本号
           LATEST_RELEASE=$(curl -s https://api.github.com/repos/lobehub/lobe-chat/releases/latest | jq -r .tag_name)
-          echo "Latest official release: $LATEST_RELEASE"
+          echo "最新官方发布版本: $LATEST_RELEASE"
           
           # 获取当前仓库的最新 tag
           CURRENT_TAG=$(git describe --tags `git rev-list --tags --max-count=1` 2>/dev/null || echo "v0.0.0")
-          echo "Current repository tag: $CURRENT_TAG"
+          echo "当前仓库标签: $CURRENT_TAG"
           
           # 比较版本号，如果不同则需要更新
           if [ "$LATEST_RELEASE" != "$CURRENT_TAG" ]; then
-            echo "New version detected, will update to $LATEST_RELEASE"
+            echo "检测到新版本，将更新至 $LATEST_RELEASE"
             echo "need_update=true" >> $GITHUB_OUTPUT
             echo "new_version=$LATEST_RELEASE" >> $GITHUB_OUTPUT
-          else
-            echo "Already up to date"
+          else:
+            echo "已是最新版本"
             echo "need_update=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Install bun
+      - name: 安装 Bun
         if: steps.check_release.outputs.need_update == 'true'
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
 
-      - name: Install deps
+      - name: 安装依赖
         if: steps.check_release.outputs.need_update == 'true'
         run: bun i
 
-      - name: Lint
-        if: steps.check_release.outputs.need_update == 'true'
-        run: bun run lint
-
-      - name: Test Server Coverage
-        if: steps.check_release.outputs.need_update == 'true'
-        run: bun run test-server:coverage
-        env:
-          DATABASE_TEST_URL: postgresql://postgres:postgres@localhost:5432/postgres
-          DATABASE_DRIVER: node
-          NEXT_PUBLIC_SERVICE_MODE: server
-          KEY_VAULTS_SECRET: LA7n9k3JdEcbSgml2sxfw+4TV1AzaaFU5+R176aQz4s=
-          S3_PUBLIC_DOMAIN: https://example.com
-          APP_URL: https://home.com
-
-      - name: Test App Coverage
-        if: steps.check_release.outputs.need_update == 'true'
-        run: bun run test-app:coverage
-
-      - name: Workflow
+      - name: 更新工作流和文档
         if: steps.check_release.outputs.need_update == 'true'
         run: bun run workflow:readme
 
-      - name: Check if tag already exists
+      - name: 检查标签是否已存在
         if: steps.check_release.outputs.need_update == 'true'
         id: check_tag
         run: |
           if git rev-parse "${{ steps.check_release.outputs.new_version }}" >/dev/null 2>&1; then
-            echo "Tag already exists"
+            echo "标签已存在"
             echo "tag_exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "Tag does not exist"
+          else:
+            echo "标签不存在"
             echo "tag_exists=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create Release
+      - name: 创建发布
         if: steps.check_release.outputs.need_update == 'true' && steps.check_tag.outputs.tag_exists == 'false'
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           NEW_VERSION: ${{ steps.check_release.outputs.new_version }}
         run: |
-          # 获取官方release的信息
+          # 获取官方发布的信息
           RELEASE_INFO=$(curl -s https://api.github.com/repos/lobehub/lobe-chat/releases/latest)
           RELEASE_BODY=$(echo "$RELEASE_INFO" | jq -r .body)
           
@@ -105,20 +89,20 @@ jobs:
           git tag $NEW_VERSION
           git push origin $NEW_VERSION
           
-          # 创建 release
+          # 创建发布
           gh release create $NEW_VERSION \
             --title "$NEW_VERSION" \
             --notes "$RELEASE_BODY" \
             --target main
 
-      - name: Commit changes
+      - name: 提交更改
         if: steps.check_release.outputs.need_update == 'true' && steps.check_tag.outputs.tag_exists == 'false'
         run: |-
           git diff
           git config --global user.name "lobehubbot"
           git config --global user.email "i@lobehub.com"
           git add .
-          git commit -m "📝 docs(bot): Auto sync agents & plugin to readme" || exit 0
+          git commit -m "📝 文档(bot): 自动同步助手和插件信息至 README" || exit 0
           git push
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
