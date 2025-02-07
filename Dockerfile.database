@@ -53,6 +53,7 @@ ARG CLERK_WEBHOOK_SECRET
 ENV NEXT_PUBLIC_BASE_PATH="${NEXT_PUBLIC_BASE_PATH}"
 
 ENV NEXT_PUBLIC_SERVICE_MODE="${NEXT_PUBLIC_SERVICE_MODE:-server}" \
+    NEXT_PUBLIC_ENABLE_NEXT_AUTH="1" \
     APP_URL="http://app.com" \
     DATABASE_DRIVER="node" \
     DATABASE_URL="postgres://postgres:password@localhost:5432/postgres" \
