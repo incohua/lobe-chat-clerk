@@ -1,4 +1,4 @@
-## Set global build ENV
+# Set global build ENV
 ARG NODEJS_VERSION="22"
 
 ## Base image for all building stages
