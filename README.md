@@ -319,14 +319,14 @@ Our marketplace is not just a showcase platform but also a collaborative space. 
 
 <!-- AGENT LIST -->
 
-| Recent Submits                                                                                                                                                              | Description                                                                                                   |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| [Astrology Researcher](https://lobechat.com/discover/assistant/fate-researcher)<br/><sup>By **[Jack980506](https://github.com/Jack980506)** on **2025-02-06**</sup>         | Expert in BaZi astrology<br/>`astrology` `ba-zi` `traditional-culture`                                        |
-| [Language Charm Learning Mentor](https://lobechat.com/discover/assistant/bad-language-helper)<br/><sup>By **[Guducat](https://github.com/Guducat)** on **2025-02-06**</sup> | Specializes in teaching the charm of language and witty responses<br/>`language-learning` `dialogue-examples` |
-| [Allinone](https://lobechat.com/discover/assistant/allinone-v-1)<br/><sup>By **[AXuanCreator](https://github.com/AXuanCreator)** on **2025-02-06**</sup>                    | Innovation · Future · Excellence<br/>`programming` `low-cost` `concise-answers`                               |
-| [Deep Thinker](https://lobechat.com/discover/assistant/deep-thinker)<br/><sup>By **[prolapser](https://github.com/prolapser)** on **2025-02-06**</sup>                      | Deep, human-like thinking and analysis.<br/>`thinking` `reasoning` `reflection` `thought` `musings`           |
+| Recent Submits                                                                                                                                                                                        | Description                                                                                                                                                      |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Xiao Zhi French Translation Assistant](https://lobechat.com/discover/assistant/xiao-zhi-french-translation-asst-v-1)<br/><sup>By **[WeR-Best](https://github.com/WeR-Best)** on **2025-02-10**</sup> | A friendly, professional, and empathetic AI assistant for French translation<br/>`ai-assistant` `french-translation` `cross-cultural-communication` `creativity` |
+| [Astrology Researcher](https://lobechat.com/discover/assistant/fate-researcher)<br/><sup>By **[Jack980506](https://github.com/Jack980506)** on **2025-02-06**</sup>                                   | Expert in BaZi astrology<br/>`astrology` `ba-zi` `traditional-culture`                                                                                           |
+| [Language Charm Learning Mentor](https://lobechat.com/discover/assistant/bad-language-helper)<br/><sup>By **[Guducat](https://github.com/Guducat)** on **2025-02-06**</sup>                           | Specializes in teaching the charm of language and witty responses<br/>`language-learning` `dialogue-examples`                                                    |
+| [Allinone](https://lobechat.com/discover/assistant/allinone-v-1)<br/><sup>By **[AXuanCreator](https://github.com/AXuanCreator)** on **2025-02-06**</sup>                                              | Innovation · Future · Excellence<br/>`programming` `low-cost` `concise-answers`                                                                                  |
 
-> 📊 Total agents: [<kbd>**485**</kbd> ](https://lobechat.com/discover/assistants)
+> 📊 Total agents: [<kbd>**486**</kbd> ](https://lobechat.com/discover/assistants)
 
  <!-- AGENT LIST -->
 
