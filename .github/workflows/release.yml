@@ -3,11 +3,15 @@ on:
   push:
     branches:
       - main
+  schedule:
+    - cron: '0 0 * * *'  # 每天执行一次
+  workflow_dispatch:     # 允许手动触发
 
 jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
+    if: ${{ github.repository_owner != 'lobehub' || github.event_name == 'workflow_dispatch' }}
 
     services:
       postgres:
@@ -21,19 +25,47 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check Upstream Version
+        id: check_version
+        run: |
+          # Clone upstream repository to temporary directory
+          git clone --quiet https://github.com/lobehub/lobe-chat.git /tmp/upstream
+          cd /tmp/upstream
+          
+          # Get latest release version from upstream
+          UPSTREAM_VERSION=$(git describe --tags --abbrev=0)
+          echo "UPSTREAM_VERSION=${UPSTREAM_VERSION}" >> $GITHUB_ENV
+          echo "Upstream version: ${UPSTREAM_VERSION}"
+          
+          # Check if we already have this version tag
+          cd $GITHUB_WORKSPACE
+          if git tag | grep -q "${UPSTREAM_VERSION}"; then
+            echo "Version ${UPSTREAM_VERSION} already exists. No need to release."
+            echo "NEED_RELEASE=false" >> $GITHUB_ENV
+          else
+            echo "New version ${UPSTREAM_VERSION} detected. Will create release."
+            echo "NEED_RELEASE=true" >> $GITHUB_ENV
+          fi
 
       - name: Install bun
+        if: env.NEED_RELEASE == 'true'
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: ${{ secrets.BUN_VERSION }}
 
       - name: Install deps
+        if: env.NEED_RELEASE == 'true'
         run: bun i
 
       - name: Lint
+        if: env.NEED_RELEASE == 'true'
         run: bun run lint
 
       - name: Test Server Coverage
+        if: env.NEED_RELEASE == 'true'
         run: bun run test-server:coverage
         env:
           DATABASE_TEST_URL: postgresql://postgres:postgres@localhost:5432/postgres
@@ -44,18 +76,32 @@ jobs:
           APP_URL: https://home.com
 
       - name: Test App Coverage
+        if: env.NEED_RELEASE == 'true'
         run: bun run test-app:coverage
 
-      - name: Release
-        run: bun run release
+      - name: Create Release with Upstream Version
+        if: env.NEED_RELEASE == 'true'
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          
+          echo "Creating tag for ${UPSTREAM_VERSION}"
+          git tag -a "${UPSTREAM_VERSION}" -m "Release ${UPSTREAM_VERSION} (synced from upstream)"
+          git push origin "${UPSTREAM_VERSION}"
+          
+          # Create GitHub release
+          gh release create "${UPSTREAM_VERSION}" \
+            --title "Release ${UPSTREAM_VERSION}" \
+            --notes "This release was automatically synced from the upstream lobehub/lobe-chat repository."
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Workflow
+        if: env.NEED_RELEASE == 'true'
         run: bun run workflow:readme
 
       - name: Commit changes
+        if: env.NEED_RELEASE == 'true'
         run: |-
           git diff
           git config --global user.name "lobehubbot"
