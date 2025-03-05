@@ -172,7 +172,10 @@ jobs:
 
           # Create GitHub release
           gh release create "${UPSTREAM_VERSION}" \
+            --repo ${{ github.repository }} \
             --title "Release ${UPSTREAM_VERSION}" \
             --notes "This release was automatically synced from the upstream lobehub/lobe-chat repository version ${UPSTREAM_VERSION}."
+  env:
+    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
