@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  REGISTRY_IMAGE: lobehub/lobe-chat-database
+  REGISTRY_IMAGE: ${{ secrets.DOCKER_REGISTRY_USER }}/lobe-chat-clerk
   PR_TAG_PREFIX: pr-
 
 jobs:
@@ -88,6 +88,10 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             SHA=${{ steps.vars.outputs.sha_short }}
+            NEXT_PUBLIC_ENABLE_NEXT_AUTH="0"
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+            CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}
+            CLERK_WEBHOOK_SECRET=${{ secrets.CLERK_WEBHOOK_SECRET }}
           outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
